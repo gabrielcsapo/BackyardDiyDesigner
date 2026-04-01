@@ -9,8 +9,8 @@ import type {
   ChairPart,
   ChairBOMEntry,
 } from "./types";
-import type { CostLineItem } from "../types";
-import { round2 } from "../engine";
+import type { CostLineItem, StockLengthFt } from "../types";
+import { round2, optimizePurchases } from "../engine";
 
 // ─── Fire Pit Ring ───
 export const FIRE_PIT_RING: FirePitRing = {
@@ -88,7 +88,7 @@ interface FirePitPricing {
 
 export const FIREPIT_PRICING: FirePitPricing = {
   lumber: {
-    "1x4": { 8: 4.52 },
+    "1x4": { 8: 4.52, 12: 7.38 },
     "2x4": { 8: 3.50 },
     "2x2": { 6: 2.98 },
   },
@@ -300,7 +300,6 @@ function generateChairParts(chairIndex: number): ChairPart[] {
 
 function calculateMaterials(config: FirePitConfig, brickRing: BrickRing): FirePitMaterialSummary {
   const pricing = FIREPIT_PRICING;
-  const wasteMult = 1 + config.wasteFactor / 100;
   const n = config.chairCount;
   const costLineItems: CostLineItem[] = [];
 
@@ -322,17 +321,53 @@ function calculateMaterials(config: FirePitConfig, brickRing: BrickRing): FirePi
     url: pricing.urls.bricks,
   });
 
-  // Lumber
-  for (const entry of CHAIR_BOM) {
-    const qty = Math.ceil(entry.qtyPerChair * n * wasteMult);
-    const unitPrice = pricing.lumber[entry.lumber]?.[entry.stockLengthFt] ?? 0;
-    costLineItems.push({
-      description: entry.description,
-      unitPrice,
-      quantity: qty,
-      lineTotal: round2(unitPrice * qty),
-      url: pricing.urls.lumber[entry.lumber],
-    });
+  // Lumber — bin-pack cuts across all chairs for optimal board usage
+  const cutsByLumber = new Map<string, number[]>();
+  for (let i = 0; i < n; i++) {
+    for (const cut of CHAIR_CUT_LIST) {
+      const cuts = cutsByLumber.get(cut.lumber) ?? [];
+      for (let q = 0; q < cut.qty; q++) cuts.push(cut.length);
+      cutsByLumber.set(cut.lumber, cuts);
+    }
+  }
+
+  // Add waste factor by adding extra cuts (duplicate shortest cuts)
+  if (config.wasteFactor > 0) {
+    for (const [lumber, cuts] of cutsByLumber) {
+      const totalInches = cuts.reduce((s, c) => s + c, 0);
+      const wasteInches = totalInches * (config.wasteFactor / 100);
+      // Add spare cuts from shortest first to cover waste allowance
+      const sorted = [...cuts].sort((a, b) => a - b);
+      let added = 0;
+      for (const cut of sorted) {
+        if (added >= wasteInches) break;
+        cuts.push(cut);
+        added += cut;
+      }
+      cutsByLumber.set(lumber, cuts);
+    }
+  }
+
+  // Available stock lengths per lumber type (from pricing keys)
+  const stockLengths = (lumber: string): StockLengthFt[] => {
+    const lengths = Object.keys(pricing.lumber[lumber] ?? {}).map(Number) as StockLengthFt[];
+    return lengths.sort((a, b) => a - b);
+  };
+
+  for (const [lumber, cuts] of cutsByLumber) {
+    const available = stockLengths(lumber);
+    const { purchases } = optimizePurchases(cuts, lumber, available);
+
+    for (const purchase of purchases) {
+      const unitPrice = pricing.lumber[lumber]?.[purchase.stockLengthFt] ?? 0;
+      costLineItems.push({
+        description: `${lumber} x ${purchase.stockLengthFt}' board`,
+        unitPrice,
+        quantity: purchase.count,
+        lineTotal: round2(unitPrice * purchase.count),
+        url: pricing.urls.lumber[lumber],
+      });
+    }
   }
 
   // Screws — 3 sizes, estimate 1 box of each per 2 chairs
