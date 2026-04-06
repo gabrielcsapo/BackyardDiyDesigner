@@ -12,7 +12,15 @@ export const LUMBER_OPTIONS: Record<string, LumberSpec> = {
     actualThickness: 1.5,
     actualWidth: 3.5,
     stockLengths: [4, 6, 8, 10, 12, 16, 20],
-    pricing: { 4: 2.18, 6: 3.0, 8: 3.5, 10: 5.48, 12: 7.18, 16: 9.78, 20: 13.48 },
+    pricing: {
+      4: 2.18,
+      6: 3.0,
+      8: 3.5,
+      10: 5.48,
+      12: 7.18,
+      16: 9.78,
+      20: 13.48,
+    },
     url: "https://www.homedepot.com/p/2-in-x-4-in-x-8-ft-2-Ground-Contact-Pressure-Treated-Southern-Yellow-Pine-Lumber-106147/206970948",
   },
   "2x6": {
@@ -20,7 +28,15 @@ export const LUMBER_OPTIONS: Record<string, LumberSpec> = {
     actualThickness: 1.5,
     actualWidth: 5.5,
     stockLengths: [4, 6, 8, 10, 12, 16, 20],
-    pricing: { 4: 3.48, 6: 4.98, 8: 6.48, 10: 8.68, 12: 10.78, 16: 15.28, 20: 19.98 },
+    pricing: {
+      4: 3.48,
+      6: 4.98,
+      8: 6.48,
+      10: 8.68,
+      12: 10.78,
+      16: 15.28,
+      20: 19.98,
+    },
     url: "https://www.homedepot.com/p/2-in-x-6-in-x-8-ft-2-Prime-Ground-Contact-Pressure-Treated-Southern-Yellow-Pine-Lumber-106180/206969408",
   },
   "2x8": {
@@ -28,7 +44,7 @@ export const LUMBER_OPTIONS: Record<string, LumberSpec> = {
     actualThickness: 1.5,
     actualWidth: 7.25,
     stockLengths: [8, 10, 12, 16, 20],
-    pricing: { 8: 8.48, 10: 10.98, 12: 13.98, 16: 18.98, 20: 24.48 },
+    pricing: { 8: 10.18, 10: 12.68, 12: 15.28, 16: 20.68, 20: 27.28 },
     url: "https://www.homedepot.com/p/2-in-x-8-in-x-8-ft-2-Ground-Contact-Pressure-Treated-Southern-Yellow-Pine-Lumber-106182/206935779",
   },
   "2x10": {
@@ -51,28 +67,78 @@ export const LUMBER_OPTIONS: Record<string, LumberSpec> = {
 
 export const DECKING_OPTIONS: Record<string, DeckingSpec> = {
   "5/4x4": {
-    label: "5/4 x 4", actualThickness: 1.0, actualWidth: 3.5,
-    pricing: { 4: 2.38, 6: 3.28, 8: 4.37, 10: 5.47, 12: 6.56, 16: 8.72, 20: 10.9 },
+    label: "5/4 x 4",
+    actualThickness: 1.0,
+    actualWidth: 3.5,
+    pricing: {
+      4: 2.38,
+      6: 3.28,
+      8: 4.37,
+      10: 5.47,
+      12: 6.56,
+      16: 8.72,
+      20: 10.9,
+    },
     url: "https://www.homedepot.com/p/WeatherShield-5-4-in-x-4-in-x-8-ft-Standard-Ground-Contact-Pressure-Treated-Pine-Decking-Board-253930/300509050",
   },
   "5/4x6": {
-    label: "5/4 x 6", actualThickness: 1.0, actualWidth: 5.5,
-    pricing: { 4: 3.58, 6: 4.88, 8: 6.48, 10: 8.18, 12: 12.98, 16: 16.48, 20: 23.98 },
+    label: "5/4 x 6",
+    actualThickness: 1.0,
+    actualWidth: 5.5,
+    pricing: {
+      4: 3.58,
+      6: 4.88,
+      8: 6.58,
+      10: 8.18,
+      12: 9.78,
+      16: 13.08,
+      20: 23.98,
+    },
     url: "https://www.homedepot.com/p/WeatherShield-5-4-in-x-6-in-x-8-ft-Standard-Ground-Contact-Pressure-Treated-Pine-Decking-Board-253931/300509052",
   },
   "2x4": {
-    label: "2 x 4", actualThickness: 1.5, actualWidth: 3.5,
-    pricing: { 4: 2.18, 6: 3.0, 8: 3.5, 10: 5.48, 12: 7.18, 16: 9.78, 20: 13.48 },
+    label: "2 x 4",
+    actualThickness: 1.5,
+    actualWidth: 3.5,
+    pricing: {
+      4: 2.18,
+      6: 3.0,
+      8: 3.5,
+      10: 5.48,
+      12: 7.18,
+      16: 9.78,
+      20: 13.48,
+    },
     url: "https://www.homedepot.com/p/2-in-x-4-in-x-8-ft-2-Prime-or-BTR-Ground-Contact-Pressure-Treated-Southern-Yellow-Pine-Lumber-106147/206970948",
   },
   "2x6": {
-    label: "2 x 6", actualThickness: 1.5, actualWidth: 5.5,
-    pricing: { 4: 3.48, 6: 4.98, 8: 6.48, 10: 8.68, 12: 10.78, 16: 15.28, 20: 19.98 },
+    label: "2 x 6",
+    actualThickness: 1.5,
+    actualWidth: 5.5,
+    pricing: {
+      4: 3.48,
+      6: 4.98,
+      8: 6.48,
+      10: 8.68,
+      12: 10.78,
+      16: 15.28,
+      20: 19.98,
+    },
     url: "https://www.homedepot.com/p/2-in-x-6-in-x-8-ft-2-Prime-Ground-Contact-Pressure-Treated-Southern-Yellow-Pine-Lumber-106180/206969408",
   },
   composite: {
-    label: 'Composite 5.5"', actualThickness: 1.0, actualWidth: 5.5,
-    pricing: { 4: 10.34, 6: 15.49, 8: 20.68, 10: 25.83, 12: 30.98, 16: 41.58, 20: 51.98 },
+    label: 'Composite 5.5"',
+    actualThickness: 1.0,
+    actualWidth: 5.5,
+    pricing: {
+      4: 10.34,
+      6: 15.49,
+      8: 20.68,
+      10: 25.83,
+      12: 30.98,
+      16: 41.58,
+      20: 51.98,
+    },
     url: "https://www.homedepot.com/p/Trex-Enhance-Naturals-1-in-x-6-in-x-8-ft-Toasted-Sand-Grooved-Edge-Composite-Deck-Board-TS010608EG01/312785416",
   },
 };
@@ -107,7 +173,9 @@ export function optimizePurchases(
   const cutsByStock = new Map<StockLengthFt, number[]>();
   for (const cut of cutLengthsInches) {
     if (cut > maxStockIn) {
-      oversized.push(`${label} cut ${inchesToFeetInches(cut)} exceeds max stock (${lengths[lengths.length - 1]}'). Must splice.`);
+      oversized.push(
+        `${label} cut ${inchesToFeetInches(cut)} exceeds max stock (${lengths[lengths.length - 1]}'). Must splice.`,
+      );
       continue;
     }
     const stockFt = lengths.find((ft) => ft * 12 >= cut)!;
@@ -124,11 +192,21 @@ export function optimizePurchases(
     for (const cut of sorted) {
       let placed = false;
       for (let i = 0; i < bins.length; i++) {
-        if (bins[i] >= cut) { bins[i] -= cut; placed = true; break; }
+        if (bins[i] >= cut) {
+          bins[i] -= cut;
+          placed = true;
+          break;
+        }
       }
       if (!placed) bins.push(stockIn - cut);
     }
-    purchases.push({ label: `${label} x ${stockFt}'`, stockLengthFt: stockFt, count: bins.length, cutsFromThis: cuts.length, wasteInches: bins.reduce((s, r) => s + r, 0) });
+    purchases.push({
+      label: `${label} x ${stockFt}'`,
+      stockLengthFt: stockFt,
+      count: bins.length,
+      cutsFromThis: cuts.length,
+      wasteInches: bins.reduce((s, r) => s + r, 0),
+    });
   }
 
   purchases.sort((a, b) => a.stockLengthFt - b.stockLengthFt);

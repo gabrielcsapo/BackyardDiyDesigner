@@ -34,22 +34,22 @@ export default function App() {
         <span style={{ fontWeight: 700, fontSize: 15, marginRight: 12 }}>
           Project Designer
         </span>
-        <NavLink to="/stairs" style={({ isActive }) => tabStyle(isActive)}>
+        <NavLink to="stairs" style={({ isActive }) => tabStyle(isActive)}>
           Box Stairs
         </NavLink>
-        <NavLink to="/fence" style={({ isActive }) => tabStyle(isActive)}>
+        <NavLink to="fence" style={({ isActive }) => tabStyle(isActive)}>
           Chicken Wire Fence
         </NavLink>
-        <NavLink to="/firepit" style={({ isActive }) => tabStyle(isActive)}>
+        <NavLink to="firepit" style={({ isActive }) => tabStyle(isActive)}>
           Fire Pit Sitting
         </NavLink>
       </nav>
       <div style={{ flex: 1, overflow: "hidden" }}>
         <Routes>
-          <Route path="/stairs" element={<StairApp />} />
-          <Route path="/fence" element={<FenceApp />} />
-          <Route path="/firepit" element={<FirePitApp />} />
-          <Route path="*" element={<Navigate to="/stairs" replace />} />
+          <Route path="stairs" element={<StairApp />} />
+          <Route path="fence" element={<FenceApp />} />
+          <Route path="firepit" element={<FirePitApp />} />
+          <Route path="*" element={<Navigate to="stairs" replace />} />
         </Routes>
       </div>
     </div>
