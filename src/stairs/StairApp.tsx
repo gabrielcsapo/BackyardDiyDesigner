@@ -42,11 +42,30 @@ const PRESETS: { label: string; config: Partial<StairConfig> }[] = [
   { label: "Narrow (3' wide)", config: { stairWidth: 36, totalRise: 15, stepCount: 2, treadDepth: 11.25 } },
 ];
 
+/** Compute the min/max valid step counts for a given total rise (targeting 4"–7.75" risers). */
+function stepCountRange(totalRise: number): { min: number; max: number; ideal: number } {
+  const min = Math.max(1, Math.ceil(totalRise / 7.75));
+  const max = Math.max(min, Math.floor(totalRise / 4));
+  // Target ~7.5" risers
+  const ideal = Math.max(min, Math.min(max, Math.round(totalRise / 7.5)));
+  return { min, max, ideal };
+}
+
 export default function App() {
   const [config, setConfig] = useState<StairConfig>(DEFAULT_CONFIG);
   const [viewMode, setViewMode] = useState<ViewMode>("finished");
   const update = useCallback((partial: Partial<StairConfig>) => {
-    setConfig((prev) => ({ ...prev, ...partial }));
+    setConfig((prev) => {
+      const next = { ...prev, ...partial };
+      // Auto-adjust step count when total rise changes to keep risers in code range
+      if (partial.totalRise !== undefined && partial.stepCount === undefined) {
+        const { min, max, ideal } = stepCountRange(next.totalRise);
+        if (next.stepCount < min || next.stepCount > max) {
+          next.stepCount = ideal;
+        }
+      }
+      return next;
+    });
   }, []);
 
   const model = useMemo(() => generateBoxStair(config), [config]);
@@ -105,15 +124,26 @@ export default function App() {
         />
 
         <label style={labelStyle}>Number of Steps</label>
-        <input
-          type="range"
-          min={1}
-          max={4}
-          value={config.stepCount}
-          style={{ width: "100%" }}
-          onChange={(e) => update({ stepCount: +e.target.value })}
-        />
-        <div style={{ fontSize: 12, textAlign: "center", color: "#666" }}>{config.stepCount}</div>
+        {(() => {
+          const range = stepCountRange(config.totalRise);
+          const riserHeight = config.totalRise / config.stepCount;
+          const outOfRange = riserHeight > 7.75 || riserHeight < 4;
+          return (
+            <>
+              <input
+                type="range"
+                min={range.min}
+                max={range.max}
+                value={config.stepCount}
+                style={{ width: "100%" }}
+                onChange={(e) => update({ stepCount: +e.target.value })}
+              />
+              <div style={{ fontSize: 12, textAlign: "center", color: outOfRange ? "#cc4400" : "#666" }}>
+                {config.stepCount} step{config.stepCount > 1 ? "s" : ""} — {riserHeight.toFixed(2)}" riser
+              </div>
+            </>
+          );
+        })()}
 
         <label style={labelStyle}>Tread Depth</label>
         <FeetInchesInput
@@ -150,6 +180,18 @@ export default function App() {
           ))}
         </select>
 
+        <label style={labelStyle}>Fascia / Trim Board</label>
+        <select
+          style={inputStyle}
+          value={config.fasciaBoard}
+          onChange={(e) => update({ fasciaBoard: e.target.value })}
+        >
+          {Object.entries(DECKING_OPTIONS).map(([key, spec]) => (
+            <option key={key} value={key}>
+              {spec.label} ({spec.actualWidth}" actual)
+            </option>
+          ))}
+        </select>
 
         {/* Advanced */}
         <details style={{ marginTop: 12 }}>

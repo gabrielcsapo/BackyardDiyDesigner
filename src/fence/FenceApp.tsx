@@ -186,18 +186,6 @@ export default function FenceApp() {
             : `${config.gateSides.length} gate(s): ${config.gateSides.join(", ")}`}
         </div>
 
-        {config.gateSides.length > 0 && (
-          <>
-            <label style={labelStyle}>Gate Width</label>
-            <FeetInchesInput
-              value={config.gateWidth}
-              min={24}
-              max={72}
-              onChange={(v) => update({ gateWidth: v })}
-            />
-          </>
-        )}
-
         {/* Lumber */}
         <label style={labelStyle}>Post Size</label>
         <select

@@ -31,12 +31,14 @@ export const DEFAULT_CONFIG: StairConfig = {
   treadOverhang: 1.0,
   supportSpacing: 16,
   wasteFactor: 10,
+  fasciaBoard: "5/4x6",
   addFascia: true,
 };
 
 export function generateBoxStair(config: StairConfig): StairModel {
   const frame = LUMBER_OPTIONS[config.frameLumber];
   const decking = DECKING_OPTIONS[config.deckingBoard];
+  const trim = DECKING_OPTIONS[config.fasciaBoard];
   const warnings: string[] = [];
 
   const riserHeight = config.totalRise / config.stepCount;
@@ -53,6 +55,12 @@ export function generateBoxStair(config: StairConfig): StairModel {
   }
   if (config.stairWidth < 36) {
     warnings.push(`Stair width ${config.stairWidth}" is below typical 36" minimum.`);
+  }
+  // Nosing overhang code compliance (IRC R311.7.5.3: 3/4" to 1-1/4")
+  if (config.treadDepth < 11 && (config.treadOverhang < 0.75 || config.treadOverhang > 1.25)) {
+    warnings.push(
+      `Tread overhang ${config.treadOverhang}" is outside the IRC 3/4"–1-1/4" nosing range.`,
+    );
   }
 
   const frameLengths = frame.stockLengths;
@@ -72,12 +80,12 @@ export function generateBoxStair(config: StairConfig): StairModel {
 
     const frameMembers = generateFrameMembers(i, config.stairWidth, boxDepth, frame, config.supportSpacing, boxY, boxZ);
     const deckBoards = generateDeckBoards(i, config.stairWidth, boxDepth, config.treadDepth, decking, config.deckingGap, config.treadOverhang, boxY, boxZ, frame.actualWidth);
-    const fasciaBoards = config.addFascia ? generateFascia(i, config.stairWidth, boxDepth, riserHeight, frame, boxY, boxZ) : [];
+    const fasciaBoards = config.addFascia ? generateFascia(i, config.stepCount, config.stairWidth, boxDepth, riserHeight, frame, boxY, boxZ) : [];
 
     steps.push({ index: i, width: config.stairWidth, depth: boxDepth, height: riserHeight, y: boxY, z: boxZ, frameMembers, deckBoards, fasciaBoards });
   }
 
-  const materials = calculateMaterials(steps, config, frame, decking);
+  const materials = calculateMaterials(steps, config, frame, decking, trim);
   return { config, steps, riserHeight, totalRun, materials, warnings };
 }
 
@@ -119,19 +127,20 @@ function generateDeckBoards(stepIndex: number, stairWidth: number, boxDepth: num
   return boards;
 }
 
-function generateFascia(stepIndex: number, stairWidth: number, _boxDepth: number, riserHeight: number, frame: LumberSpec, y: number, z: number): FasciaBoard[] {
+function generateFascia(stepIndex: number, _stepCount: number, stairWidth: number, boxDepth: number, riserHeight: number, frame: LumberSpec, y: number, z: number): FasciaBoard[] {
   const boards: FasciaBoard[] = [];
   const t = frame.actualThickness;
-  const sideLength = _boxDepth;
+  const sideLength = boxDepth;
 
   boards.push({ id: `fascia-${stepIndex}-front`, stepIndex, face: "front", length: stairWidth + 2 * t, height: riserHeight, position: [0, y + riserHeight / 2, z - t / 2], rotation: [0, 0, 0] });
   boards.push({ id: `fascia-${stepIndex}-left`, stepIndex, face: "left", length: sideLength, height: riserHeight, position: [-stairWidth / 2 - t / 2, y + riserHeight / 2, z + sideLength / 2], rotation: [0, Math.PI / 2, 0] });
   boards.push({ id: `fascia-${stepIndex}-right`, stepIndex, face: "right", length: sideLength, height: riserHeight, position: [stairWidth / 2 + t / 2, y + riserHeight / 2, z + sideLength / 2], rotation: [0, Math.PI / 2, 0] });
 
+
   return boards;
 }
 
-function calculateMaterials(steps: BoxStep[], _config: StairConfig, frame: LumberSpec, decking: DeckingSpec): MaterialSummary {
+function calculateMaterials(steps: BoxStep[], config: StairConfig, frame: LumberSpec, decking: DeckingSpec, trim: DeckingSpec): MaterialSummary {
   const framingCuts: number[] = [];
   const deckingCuts: number[] = [];
   const fasciaCuts: number[] = [];
@@ -156,26 +165,40 @@ function calculateMaterials(steps: BoxStep[], _config: StairConfig, frame: Lumbe
     screwCount += 12;
   }
 
-  const framingResult = optimizePurchases(framingCuts, frame.label, frame.stockLengths);
-  const deckingResult = optimizePurchases(deckingCuts, decking.label);
-  const fasciaResult = optimizePurchases(fasciaCuts, "Fascia", frame.stockLengths);
+  // Apply waste factor: add extra cuts proportional to waste percentage.
+  // This ensures the shopping list accounts for mis-cuts and defects.
+  const wasteMul = 1 + (config.wasteFactor / 100);
+  const framingCutsWithWaste = applyWasteFactor(framingCuts, wasteMul);
+  const deckingCutsWithWaste = applyWasteFactor(deckingCuts, wasteMul);
+  const fasciaCutsWithWaste = applyWasteFactor(fasciaCuts, wasteMul);
+
+  const framingResult = optimizePurchases(framingCutsWithWaste, frame.label, frame.stockLengths, frame.pricing);
+  const deckingResult = optimizePurchases(deckingCutsWithWaste, decking.label, undefined, decking.pricing);
+  const fasciaResult = optimizePurchases(fasciaCutsWithWaste, trim.label, undefined, trim.pricing);
 
   const oversizedCuts = [...framingResult.oversized, ...deckingResult.oversized, ...fasciaResult.oversized];
 
-  const costLineItems: CostLineItem[] = [];
+  // Build cost line items, merging duplicates (e.g. same board used for decking + fascia)
+  const costMap = new Map<string, CostLineItem>();
 
-  for (const p of framingResult.purchases) {
-    const unitPrice = frame.pricing[p.stockLengthFt as StockLengthFt] ?? 0;
-    costLineItems.push({ description: p.label, unitPrice, quantity: p.count, lineTotal: round2(unitPrice * p.count), url: frame.url });
-  }
-  for (const p of deckingResult.purchases) {
-    const unitPrice = decking.pricing[p.stockLengthFt as StockLengthFt] ?? 0;
-    costLineItems.push({ description: p.label, unitPrice, quantity: p.count, lineTotal: round2(unitPrice * p.count), url: decking.url });
-  }
-  for (const p of fasciaResult.purchases) {
-    const unitPrice = frame.pricing[p.stockLengthFt as StockLengthFt] ?? 0;
-    costLineItems.push({ description: p.label, unitPrice, quantity: p.count, lineTotal: round2(unitPrice * p.count), url: frame.url });
-  }
+  const addCostItems = (purchases: BoardPurchase[], spec: { pricing: Partial<Record<StockLengthFt, number>>; url: string }) => {
+    for (const p of purchases) {
+      const unitPrice = spec.pricing[p.stockLengthFt as StockLengthFt] ?? 0;
+      const existing = costMap.get(p.label);
+      if (existing) {
+        existing.quantity += p.count;
+        existing.lineTotal = round2(existing.unitPrice * existing.quantity);
+      } else {
+        costMap.set(p.label, { description: p.label, unitPrice, quantity: p.count, lineTotal: round2(unitPrice * p.count), url: spec.url });
+      }
+    }
+  };
+
+  addCostItems(framingResult.purchases, frame);
+  addCostItems(deckingResult.purchases, decking);
+  addCostItems(fasciaResult.purchases, trim);
+
+  const costLineItems = [...costMap.values()];
 
   const screws = SCREW_PRICING;
   const lbsNeeded = Math.ceil(screwCount / screws.screwsPerLb);
@@ -201,4 +224,16 @@ function calculateMaterials(steps: BoxStep[], _config: StairConfig, frame: Lumbe
     framingPurchases: framingResult.purchases, deckingPurchases: deckingResult.purchases, fasciaPurchases: fasciaResult.purchases,
     oversizedCuts, costLineItems, costTotal,
   };
+}
+
+/**
+ * Duplicate the longest cuts to account for a waste factor.
+ * E.g. 10% waste on 10 cuts → 1 extra cut (the longest, most likely to be mis-cut).
+ */
+function applyWasteFactor(cuts: number[], multiplier: number): number[] {
+  if (multiplier <= 1 || cuts.length === 0) return cuts;
+  const extra = Math.ceil(cuts.length * (multiplier - 1));
+  const sorted = [...cuts].sort((a, b) => b - a);
+  // Add extra copies of the longest cuts (most expensive to re-buy)
+  return [...cuts, ...sorted.slice(0, extra)];
 }

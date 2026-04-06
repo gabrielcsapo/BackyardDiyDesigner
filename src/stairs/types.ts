@@ -11,6 +11,7 @@ export interface StairConfig {
   treadOverhang: number;
   supportSpacing: number;
   wasteFactor: number;
+  fasciaBoard: string;
   addFascia: boolean;
 }
 

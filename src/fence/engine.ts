@@ -11,8 +11,13 @@ import type {
   RailSpec,
 } from "./types";
 import type { BoardPurchase, CostLineItem } from "../types";
-import { STOCK_LENGTHS_FT } from "../types";
-import { optimizePurchases, inchesToFeetInches, round2 } from "../engine";
+import {
+  POST_LUMBER_OPTIONS,
+  LUMBER_OPTIONS,
+  HARDWARE_CATALOG,
+  optimizePurchases,
+  round2,
+} from "../engine";
 
 export const POST_OPTIONS: Record<string, PostSpec> = {
   "4x4": { label: "4x4", actualSize: 3.5 },
@@ -24,67 +29,14 @@ export const RAIL_OPTIONS: Record<string, RailSpec> = {
   "2x6": { label: "2x6", actualThickness: 1.5, actualWidth: 5.5 },
 };
 
-interface FencePricingTable {
-  posts: Record<string, Record<number, number>>;
-  rails: Record<string, Record<number, number>>;
-  chickenWire: { rollFt: number; height: number; price: number }[];
-  concrete: { bagLbs: number; lbsPerHole: number; price: number };
-  gateHardware: { gateKit: number };
-  staples: { pricePerBox: number; linearFtPerBox: number };
-  screws: { perBox: number; screwsPerBox: number; price: number };
-  urls: {
-    posts: Record<string, string>;
-    rails: Record<string, string>;
-    chickenWire: string;
-    concrete: string;
-    gateKit: string;
-    staples: string;
-    screws: string;
-  };
-}
-
-/**
- * Fence pricing — Home Depot retail (2025).
- * Chicken wire: Fencer Wire confirmed via homedepot.com.
- * HD product ref: Fencer Wire 6'x150' NB20-6X150M2 (SKU 312275613).
- */
-export const FENCE_PRICING: FencePricingTable = {
-  posts: {
-    "4x4": { 4: 5.48, 6: 8.28, 8: 10.98, 10: 15.48, 12: 19.98 },
-    "6x6": { 4: 12.98, 6: 19.48, 8: 25.98, 10: 34.48, 12: 42.98 },
-  },
-  rails: {
-    "2x4": { 4: 2.18, 6: 3.00, 8: 3.50, 10: 5.48, 12: 7.18, 16: 9.78, 20: 13.48 },
-    "2x6": { 4: 3.48, 6: 4.98, 8: 6.48, 10: 8.68, 12: 10.78, 16: 15.28, 20: 19.98 },
-  },
-  // Fencer Wire poultry netting, 20-gauge, 2" mesh — confirmed via homedepot.com
-  chickenWire: [
-    { rollFt: 150, height: 24, price: 35.91 },
-    { rollFt: 150, height: 36, price: 42.18 },
-    { rollFt: 150, height: 48, price: 56.68 },
-    { rollFt: 150, height: 60, price: 62.88 },
-    { rollFt: 150, height: 72, price: 88.16 },
-  ],
-  concrete: { bagLbs: 80, lbsPerHole: 40, price: 5.98 },
-  gateHardware: { gateKit: 27.58 }, // Everbilt Black Self-Closing Gate Kit (SKU 327599729)
-  staples: { pricePerBox: 8.50, linearFtPerBox: 25 },
-  screws: { perBox: 125, screwsPerBox: 125, price: 27.97 }, // Kreg pocket-hole screws
-  urls: {
-    posts: {
-      "4x4": "https://www.homedepot.com/p/4-in-x-4-in-x-8-ft-2-Pressure-Treated-Ground-Contact-Southern-Yellow-Pine-Timber-106503/206970954",
-      "6x6": "https://www.homedepot.com/p/6-in-x-6-in-x-8-ft-2-Pressure-Treated-Ground-Contact-Southern-Yellow-Pine-Timber-260691/206970966",
-    },
-    rails: {
-      "2x4": "https://www.homedepot.com/p/2-in-x-4-in-x-8-ft-2-Prime-or-BTR-Ground-Contact-Pressure-Treated-Southern-Yellow-Pine-Lumber-106147/206970948",
-      "2x6": "https://www.homedepot.com/p/2-in-x-6-in-x-8-ft-2-Prime-Ground-Contact-Pressure-Treated-Southern-Yellow-Pine-Lumber-106180/206969408",
-    },
-    chickenWire: "https://www.homedepot.com/p/Fencer-Wire-3-ft-x-150-ft-20-Gauge-Poultry-Netting-with-2-in-Mesh-NB20-3X150M2/312275611",
-    concrete: "https://www.homedepot.com/p/Quikrete-80-lb-Fast-Setting-Concrete-Mix-100480/100318521",
-    gateKit: "https://www.homedepot.com/p/Everbilt-Black-Self-Closing-Gate-Kit-24390/327599729",
-    staples: "https://www.homedepot.com/p/Grip-Rite-1-in-Galvanized-Poultry-Staples-1-lb-Pack-114HGPS1/100187800",
-    screws: "https://www.homedepot.com/p/Kreg-1-1-4-in-8-Coarse-Washer-Head-Zinc-Pocket-Hole-Screws-100-Pack-SML-C125-100/203814098",
-  },
+/** Concrete lbs per post hole, keyed by post size. */
+const CONCRETE_LBS_PER_HOLE: Record<string, number> = {
+  "4x4": 60, // 10" diameter hole × 24"+ depth
+  "6x6": 80, // 12" diameter hole × 24"+ depth
 };
+
+/** Standard chicken wire roll heights (inches). */
+const STANDARD_WIRE_HEIGHTS = [24, 36, 48, 60, 72];
 
 export const DEFAULT_FENCE_CONFIG: FenceConfig = {
   enclosureWidth: 144, // 12 feet
@@ -94,13 +46,20 @@ export const DEFAULT_FENCE_CONFIG: FenceConfig = {
   postSize: "4x4",
   railSize: "2x4",
   gateSides: ["front"],
-  gateWidth: 36,
   addChickenWire: true,
   chickenWireHeight: 36,
   wasteFactor: 10,
 };
 
-const POST_BURIAL_DEPTH = 24;
+/** Post burial depth: 1/3 of above-ground height + 6", minimum 24". */
+function postBurialDepth(fenceHeight: number): number {
+  return Math.max(24, Math.ceil(fenceHeight / 3) + 6);
+}
+
+/** Whether fence is tall enough to need a middle rail (> 48"). */
+function needsMiddleRail(fenceHeight: number): boolean {
+  return fenceHeight > 48;
+}
 
 interface WallDef {
   side: FenceSide;
@@ -124,16 +83,25 @@ export function generateFence(config: FenceConfig): FenceModel {
   if (config.addChickenWire && config.height > 72) {
     warnings.push(`Chicken wire is only available up to 6' (72") fence height. Current height ${config.height}" exceeds maximum supported size.`);
   }
-  if (config.addChickenWire && config.chickenWireHeight > 72) {
-    warnings.push(`Chicken wire rolls are only available up to 72" (6') height. Selected ${config.chickenWireHeight}" is not a standard size.`);
+  if (config.addChickenWire && !STANDARD_WIRE_HEIGHTS.includes(config.chickenWireHeight)) {
+    warnings.push(`Chicken wire height ${config.chickenWireHeight}" is not a standard roll size. Available: ${STANDARD_WIRE_HEIGHTS.join('", "')}".`);
   }
 
-  const postTotalLength = config.height + POST_BURIAL_DEPTH;
+  const burialDepth = postBurialDepth(config.height);
+  const postTotalLength = config.height + burialDepth;
+  const addMiddleRail = needsMiddleRail(config.height);
   const W = config.enclosureWidth;
   const D = config.enclosureDepth;
 
+  // Validate chicken wire height vs actual panel height
+  if (config.addChickenWire) {
+    const panelH = config.height - 2 * railSpec.actualWidth;
+    if (config.chickenWireHeight < panelH) {
+      warnings.push(`Chicken wire height ${config.chickenWireHeight}" is shorter than the panel opening (${round2(panelH)}"). Wire won't cover the full span.`);
+    }
+  }
+
   // Define 4 walls (outer edge positions).
-  // Posts sit at corners and along each wall.
   // Walls go clockwise: front (near Z=0), right, back, left
   const walls: WallDef[] = [
     { side: "front", startX: 0, startZ: 0, endX: W, endZ: 0, length: W, rotation: 0 },
@@ -166,8 +134,7 @@ export function generateFence(config: FenceConfig): FenceModel {
     const dz = (wall.endZ - wall.startZ) / wallLen;
 
     // Generate posts along this wall. The LAST post of each wall is the FIRST post
-    // of the next wall (corner), so we only generate posts 0..bayCount-1 and let
-    // the next wall's first post be the shared corner.
+    // of the next wall (corner), so we only generate posts 0..bayCount-1.
     for (let i = 0; i < bayCount; i++) {
       const x = wall.startX + dx * actualSpacing * i;
       const z = wall.startZ + dz * actualSpacing * i;
@@ -219,6 +186,19 @@ export function generateFence(config: FenceConfig): FenceModel {
         railSpec,
       });
 
+      // Middle rail for fences > 48"
+      if (addMiddleRail) {
+        rails.push({
+          id: `rail-mid-${wall.side}-${bay}`,
+          position: [cx, config.height / 2, cz],
+          rotation: wall.rotation,
+          length: spanLength,
+          role: "middle",
+          side: wall.side,
+          railSpec,
+        });
+      }
+
       if (isGateBay) {
         const gateHeight = config.height - railSpec.actualWidth;
         gates.push({
@@ -245,7 +225,7 @@ export function generateFence(config: FenceConfig): FenceModel {
   }
 
   const materials = calculateMaterials(
-    config, posts, rails, panels, gates, postSpec, railSpec, postTotalLength
+    config, posts, rails, panels, gates, postSpec, railSpec, postTotalLength, burialDepth
   );
 
   return { config, posts, rails, panels, gates, materials, warnings };
@@ -260,8 +240,9 @@ function calculateMaterials(
   postSpec: PostSpec,
   railSpec: RailSpec,
   postTotalLength: number,
+  burialDepth: number,
 ): FenceMaterialSummary {
-  const fencePricing = FENCE_PRICING;
+  const hw = HARDWARE_CATALOG;
   const wasteMult = 1 + config.wasteFactor / 100;
 
   const postCount = posts.length;
@@ -282,17 +263,17 @@ function calculateMaterials(
   let chickenWireRolls = 0;
   const chickenWireRollSize = 150;
   if (chickenWireLinearFt > 0) {
-    chickenWireRolls = Math.ceil(chickenWireLinearFt / 150);
+    chickenWireRolls = Math.ceil(chickenWireLinearFt / chickenWireRollSize);
   }
 
   const stapleBoxes = chickenWireLinearFt > 0
-    ? Math.ceil(chickenWireLinearFt / fencePricing.staples.linearFtPerBox)
+    ? Math.ceil(chickenWireLinearFt / hw.poultryStaples.linearFtPerBox)
     : 0;
 
-  // Concrete: each post hole needs lbsPerHole of concrete, sold in bagLbs bags
-  const { bagLbs, lbsPerHole } = fencePricing.concrete;
+  // Concrete: lbs per hole varies by post size
+  const lbsPerHole = CONCRETE_LBS_PER_HOLE[config.postSize] ?? 60;
   const totalConcreteLbs = postCount * lbsPerHole;
-  const concreteBags = Math.ceil(totalConcreteLbs / bagLbs);
+  const concreteBags = Math.ceil(totalConcreteLbs / hw.concrete.bagLbs);
 
   const gateKits = gates.length;
 
@@ -300,8 +281,11 @@ function calculateMaterials(
   let screwCount = rails.length * 8;
   screwCount += gates.length * 8; // gate frame assembly
 
-  const postResult = optimizePurchases(postCuts, postSpec.label);
-  const railResult = optimizePurchases(railCuts, railSpec.label);
+  // Use stock lengths from the shared lumber catalog
+  const postLumber = POST_LUMBER_OPTIONS[config.postSize];
+  const railLumber = LUMBER_OPTIONS[config.railSize];
+  const postResult = optimizePurchases(postCuts, postSpec.label, postLumber?.stockLengths, postLumber?.pricing);
+  const railResult = optimizePurchases(railCuts, railSpec.label, railLumber?.stockLengths, railLumber?.pricing);
 
   // Apply waste factor as extra boards (round up), not inflated cut lengths
   const applyWaste = (p: BoardPurchase[]): BoardPurchase[] =>
@@ -321,82 +305,85 @@ function calculateMaterials(
   const wastedRails = applyWaste(railResult.purchases);
 
   for (const p of wastedPosts) {
-    const priceTable = fencePricing.posts[config.postSize];
-    const unitPrice = priceTable?.[p.stockLengthFt] ?? 0;
+    const unitPrice = postLumber?.pricing[p.stockLengthFt as keyof typeof postLumber.pricing] ?? 0;
     costLineItems.push({
-      description: `${postSpec.label} x ${p.stockLengthFt}' post`,
+      description: `${postSpec.label} x ${p.stockLengthFt}'`,
       unitPrice,
       quantity: p.count,
       lineTotal: round2(unitPrice * p.count),
-      url: fencePricing.urls.posts[config.postSize],
+      url: postLumber?.url,
     });
   }
 
   for (const p of wastedRails) {
-    const priceTable = fencePricing.rails[config.railSize];
-    const unitPrice = priceTable?.[p.stockLengthFt] ?? 0;
+    const unitPrice = railLumber?.pricing[p.stockLengthFt as keyof typeof railLumber.pricing] ?? 0;
     costLineItems.push({
-      description: `${railSpec.label} x ${p.stockLengthFt}' rail`,
+      description: `${railSpec.label} x ${p.stockLengthFt}'`,
       unitPrice,
       quantity: p.count,
       lineTotal: round2(unitPrice * p.count),
-      url: fencePricing.urls.rails[config.railSize],
+      url: railLumber?.url,
     });
   }
 
   if (chickenWireRolls > 0) {
-    const wireOption = fencePricing.chickenWire.find(
+    // Find the best matching roll height (smallest that fits the panel opening)
+    const panelH = config.height - 2 * railSpec.actualWidth;
+    const wireOption = hw.chickenWire.rolls.find(
       (w) => w.rollFt === chickenWireRollSize && w.height === config.chickenWireHeight
+    ) ?? hw.chickenWire.rolls.find(
+      (w) => w.rollFt === chickenWireRollSize && w.height >= panelH
     );
-    const unitPrice = wireOption?.price ?? 35;
+    const unitPrice = wireOption?.price ?? hw.chickenWire.rolls[0].price;
+    const rollHeight = wireOption?.height ?? config.chickenWireHeight;
     costLineItems.push({
-      description: `Chicken wire ${chickenWireRollSize}' x ${config.chickenWireHeight}" roll`,
+      description: `Chicken wire ${chickenWireRollSize}' x ${rollHeight}" roll`,
       unitPrice,
       quantity: chickenWireRolls,
       lineTotal: round2(unitPrice * chickenWireRolls),
-      url: fencePricing.urls.chickenWire,
+      url: hw.chickenWire.url,
     });
   }
 
   // Concrete
   if (concreteBags > 0) {
     costLineItems.push({
-      description: `Concrete mix ${bagLbs}lb bag`,
-      unitPrice: fencePricing.concrete.price,
+      description: `Concrete mix ${hw.concrete.bagLbs}lb bag`,
+      unitPrice: hw.concrete.price,
       quantity: concreteBags,
-      lineTotal: round2(fencePricing.concrete.price * concreteBags),
-      url: fencePricing.urls.concrete,
+      lineTotal: round2(hw.concrete.price * concreteBags),
+      url: hw.concrete.url,
     });
   }
 
   if (stapleBoxes > 0) {
     costLineItems.push({
       description: "Poultry staples (box)",
-      unitPrice: fencePricing.staples.pricePerBox,
+      unitPrice: hw.poultryStaples.pricePerBox,
       quantity: stapleBoxes,
-      lineTotal: round2(fencePricing.staples.pricePerBox * stapleBoxes),
-      url: fencePricing.urls.staples,
+      lineTotal: round2(hw.poultryStaples.pricePerBox * stapleBoxes),
+      url: hw.poultryStaples.url,
     });
   }
 
   if (gateKits > 0) {
     costLineItems.push({
       description: "Everbilt Self-Closing Gate Kit",
-      unitPrice: fencePricing.gateHardware.gateKit,
+      unitPrice: hw.gateKit.price,
       quantity: gateKits,
-      lineTotal: round2(fencePricing.gateHardware.gateKit * gateKits),
-      url: fencePricing.urls.gateKit,
+      lineTotal: round2(hw.gateKit.price * gateKits),
+      url: hw.gateKit.url,
     });
   }
 
   if (screwCount > 0) {
-    const boxesNeeded = Math.ceil(screwCount / fencePricing.screws.screwsPerBox);
+    const boxesNeeded = Math.ceil(screwCount / hw.pocketScrews.screwsPerBox);
     costLineItems.push({
       description: `Pocket-hole screws (${boxesNeeded} x 125pk)`,
-      unitPrice: fencePricing.screws.price,
+      unitPrice: hw.pocketScrews.price,
       quantity: boxesNeeded,
-      lineTotal: round2(boxesNeeded * fencePricing.screws.price),
-      url: fencePricing.urls.screws,
+      lineTotal: round2(boxesNeeded * hw.pocketScrews.price),
+      url: hw.pocketScrews.url,
     });
   }
 
@@ -405,6 +392,7 @@ function calculateMaterials(
   return {
     postCount,
     postLength: postTotalLength,
+    burialDepth,
     railCount: rails.length,
     railCuts: Array.from(railCutSummary.entries()).map(([length, count]) => ({ length, count })),
     chickenWireLinearFt,

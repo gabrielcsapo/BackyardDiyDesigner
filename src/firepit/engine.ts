@@ -10,29 +10,30 @@ import type {
   ChairBOMEntry,
 } from "./types";
 import type { CostLineItem, StockLengthFt } from "../types";
-import { round2, optimizePurchases } from "../engine";
+import { LUMBER_OPTIONS, HARDWARE_CATALOG, SCREW_PRICING, round2, optimizePurchases } from "../engine";
 
-// ─── Fire Pit Ring ───
+// ─── Derived specs from shared catalog ───
+const hw = HARDWARE_CATALOG;
+
 export const FIRE_PIT_RING: FirePitRing = {
-  outerDiameter: 45,
-  innerDiameter: 39,
-  height: 10,
-  price: 63.99,
+  outerDiameter: hw.firePitRing.outerDiameter,
+  innerDiameter: hw.firePitRing.innerDiameter,
+  height: hw.firePitRing.height,
+  price: hw.firePitRing.price,
 };
 
-// ─── Retaining Wall Blocks ───
 export const BRICK_SPEC: BrickSpec = {
-  width: 11.75,
-  height: 4,
-  depth: 6.75,
-  price: 2.37,
+  width: hw.retainingWallBlock.width,
+  height: hw.retainingWallBlock.height,
+  depth: hw.retainingWallBlock.depth,
+  price: hw.retainingWallBlock.price,
 };
 
 // ─── Lumber actual dimensions (inches) ───
 const DIMS: Record<string, { t: number; w: number }> = {
-  "2x4": { t: 1.5, w: 3.5 },
-  "2x2": { t: 1.5, w: 1.5 },
-  "1x4": { t: 0.75, w: 3.5 },
+  "2x4": { t: LUMBER_OPTIONS["2x4"].actualThickness, w: LUMBER_OPTIONS["2x4"].actualWidth },
+  "2x2": { t: LUMBER_OPTIONS["2x2"].actualThickness, w: LUMBER_OPTIONS["2x2"].actualWidth },
+  "1x4": { t: LUMBER_OPTIONS["1x4"].actualThickness, w: LUMBER_OPTIONS["1x4"].actualWidth },
 };
 
 // ─── Chair geometry constants ───
@@ -73,41 +74,12 @@ export const CHAIR_CUT_LIST: { role: string; lumber: string; length: number; qty
   { role: "arm-rest",          lumber: "1x4", length: 27,     qty: 2 },
 ];
 
-// ─── Pricing ───
-
-interface FirePitPricing {
-  lumber: Record<string, Record<number, number>>;
-  screws: { description: string; price: number }[];
-  urls: {
-    lumber: Record<string, string>;
-    firePitRing: string;
-    bricks: string;
-    screws: string;
-  };
-}
-
-export const FIREPIT_PRICING: FirePitPricing = {
-  lumber: {
-    "1x4": { 8: 4.52, 12: 7.38 },
-    "2x4": { 8: 3.50 },
-    "2x2": { 6: 2.98 },
-  },
-  screws: [
-    { description: '1¼" deck screws (1 lb)', price: 9.97 },
-    { description: '2" deck screws (1 lb)', price: 9.97 },
-    { description: '2½" deck screws (1 lb)', price: 9.97 },
-  ],
-  urls: {
-    lumber: {
-      "1x4": "https://www.homedepot.com/p/1-in-x-4-in-x-8-ft-Premium-Kiln-Dried-Square-Edge-Whitewood-Common-Board-914681/100023465",
-      "2x4": "https://www.homedepot.com/p/2-in-x-4-in-x-8-ft-2-Prime-or-BTR-Ground-Contact-Pressure-Treated-Southern-Yellow-Pine-Lumber-106147/206970948",
-      "2x2": "https://www.homedepot.com/p/2-in-x-2-in-x-6-ft-Furring-Strip-Board-75800593/100087930",
-    },
-    firePitRing: "https://www.vevor.com/charcoal-fire-pit-c_10232/vevor-fire-pit-ring-round-45-inch-outer-steel-liner-diy-campfire-ring-firepit-p_010351371011",
-    bricks: "https://www.homedepot.com/p/4-in-x-11-75-in-x-6-75-in-Pewter-Concrete-Retaining-Wall-Block-81100/100333178",
-    screws: "https://www.homedepot.com/p/GRK-8-x-2-1-2-in-Star-Drive-Bugle-Head-R4-Multi-Purpose-Screw-1-lb-Pack-772691-117723/204853166",
-  },
-};
+// ─── Screw sizes for chair assembly ───
+const CHAIR_SCREW_SIZES = [
+  { description: '1¼" deck screws (1 lb)', price: SCREW_PRICING.perLb },
+  { description: '2" deck screws (1 lb)', price: SCREW_PRICING.perLb },
+  { description: '2½" deck screws (1 lb)', price: SCREW_PRICING.perLb },
+];
 
 export const DEFAULT_FIREPIT_CONFIG: FirePitConfig = {
   chairCount: 4,
@@ -299,7 +271,6 @@ function generateChairParts(chairIndex: number): ChairPart[] {
 // ─── Materials & Cost ───
 
 function calculateMaterials(config: FirePitConfig, brickRing: BrickRing): FirePitMaterialSummary {
-  const pricing = FIREPIT_PRICING;
   const n = config.chairCount;
   const costLineItems: CostLineItem[] = [];
 
@@ -309,7 +280,7 @@ function calculateMaterials(config: FirePitConfig, brickRing: BrickRing): FirePi
     unitPrice: FIRE_PIT_RING.price,
     quantity: 1,
     lineTotal: FIRE_PIT_RING.price,
-    url: pricing.urls.firePitRing,
+    url: hw.firePitRing.url,
   });
 
   // Bricks
@@ -318,7 +289,7 @@ function calculateMaterials(config: FirePitConfig, brickRing: BrickRing): FirePi
     unitPrice: BRICK_SPEC.price,
     quantity: brickRing.totalBricks,
     lineTotal: round2(BRICK_SPEC.price * brickRing.totalBricks),
-    url: pricing.urls.bricks,
+    url: hw.retainingWallBlock.url,
   });
 
   // Lumber — bin-pack cuts across all chairs for optimal board usage
@@ -336,7 +307,6 @@ function calculateMaterials(config: FirePitConfig, brickRing: BrickRing): FirePi
     for (const [lumber, cuts] of cutsByLumber) {
       const totalInches = cuts.reduce((s, c) => s + c, 0);
       const wasteInches = totalInches * (config.wasteFactor / 100);
-      // Add spare cuts from shortest first to cover waste allowance
       const sorted = [...cuts].sort((a, b) => a - b);
       let added = 0;
       for (const cut of sorted) {
@@ -348,37 +318,32 @@ function calculateMaterials(config: FirePitConfig, brickRing: BrickRing): FirePi
     }
   }
 
-  // Available stock lengths per lumber type (from pricing keys)
-  const stockLengths = (lumber: string): StockLengthFt[] => {
-    const lengths = Object.keys(pricing.lumber[lumber] ?? {}).map(Number) as StockLengthFt[];
-    return lengths.sort((a, b) => a - b);
-  };
-
   for (const [lumber, cuts] of cutsByLumber) {
-    const available = stockLengths(lumber);
-    const { purchases } = optimizePurchases(cuts, lumber, available);
+    const spec = LUMBER_OPTIONS[lumber];
+    const available = spec?.stockLengths ?? ([8] as const);
+    const { purchases } = optimizePurchases(cuts, lumber, available, spec?.pricing);
 
     for (const purchase of purchases) {
-      const unitPrice = pricing.lumber[lumber]?.[purchase.stockLengthFt] ?? 0;
+      const unitPrice = spec?.pricing[purchase.stockLengthFt as StockLengthFt] ?? 0;
       costLineItems.push({
-        description: `${lumber} x ${purchase.stockLengthFt}' board`,
+        description: `${lumber} x ${purchase.stockLengthFt}'`,
         unitPrice,
         quantity: purchase.count,
         lineTotal: round2(unitPrice * purchase.count),
-        url: pricing.urls.lumber[lumber],
+        url: spec?.url,
       });
     }
   }
 
   // Screws — 3 sizes, estimate 1 box of each per 2 chairs
-  for (const screw of pricing.screws) {
+  for (const screw of CHAIR_SCREW_SIZES) {
     const boxes = Math.ceil(n / 2);
     costLineItems.push({
       description: screw.description,
       unitPrice: screw.price,
       quantity: boxes,
       lineTotal: round2(screw.price * boxes),
-      url: pricing.urls.screws,
+      url: SCREW_PRICING.url,
     });
   }
 

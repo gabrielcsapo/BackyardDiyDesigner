@@ -20,9 +20,7 @@ export default function FenceMaterialList({ model }: FenceMaterialListProps) {
           <Row label="Fence Height" value={inchesToFeetInches(config.height)} />
           <Row label="Post Spacing" value={inchesToFeetInches(config.postSpacing)} />
           <Row label="Gates" value={config.gateSides.length > 0 ? config.gateSides.join(", ") : "none"} />
-          {config.gateSides.length > 0 && (
-            <Row label="Gate Width" value={inchesToFeetInches(config.gateWidth)} />
-          )}
+          <Row label="Post Burial" value={inchesToFeetInches(materials.burialDepth)} />
         </tbody>
       </table>
 

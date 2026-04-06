@@ -21,7 +21,6 @@ export interface FenceConfig {
   postSize: string; // key into POST_OPTIONS
   railSize: string; // key into RAIL_OPTIONS
   gateSides: FenceSide[]; // which sides have a gate opening
-  gateWidth: number; // inches - width of each gate opening (default 36")
   addChickenWire: boolean;
   chickenWireHeight: number; // inches - 24", 36", or 48"
   wasteFactor: number;
@@ -42,7 +41,7 @@ export interface FenceRail {
   position: [number, number, number];
   rotation: number; // Y-axis rotation in radians (0 = along X, PI/2 = along Z)
   length: number;
-  role: "top" | "bottom";
+  role: "top" | "middle" | "bottom";
   side: FenceSide;
   railSpec: RailSpec;
 }
@@ -69,6 +68,7 @@ export type FenceMember = FencePost | FenceRail | FencePanel | FenceGate;
 export interface FenceMaterialSummary {
   postCount: number;
   postLength: number;
+  burialDepth: number;
   railCount: number;
   railCuts: { length: number; count: number }[];
   chickenWireLinearFt: number;
