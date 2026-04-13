@@ -3,6 +3,8 @@ import { Routes, Route, Navigate, NavLink } from "react-router-dom";
 import StairApp from "./stairs/StairApp";
 import FenceApp from "./fence/FenceApp";
 import FirePitApp from "./firepit/FirePitApp";
+import GardenBedApp from "./gardenbed/GardenBedApp";
+import PergolaApp from "./pergola/PergolaApp";
 
 const navStyle: React.CSSProperties = {
   display: "flex",
@@ -43,13 +45,21 @@ export default function App() {
         <NavLink to="firepit" style={({ isActive }) => tabStyle(isActive)}>
           Fire Pit Sitting
         </NavLink>
+        <NavLink to="gardenbed" style={({ isActive }) => tabStyle(isActive)}>
+          Brick Garden Bed
+        </NavLink>
+        <NavLink to="pergola" style={({ isActive }) => tabStyle(isActive)}>
+          Pergola
+        </NavLink>
       </nav>
       <div style={{ flex: 1, overflow: "hidden" }}>
         <Routes>
           <Route path="stairs" element={<StairApp />} />
           <Route path="fence" element={<FenceApp />} />
           <Route path="firepit" element={<FirePitApp />} />
-          <Route path="*" element={<Navigate to="stairs" replace />} />
+          <Route path="gardenbed" element={<GardenBedApp />} />
+          <Route path="pergola" element={<PergolaApp />} />
+          <Route index element={<Navigate to="stairs" replace />} />
         </Routes>
       </div>
     </div>
